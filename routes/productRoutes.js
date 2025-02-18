@@ -5,23 +5,41 @@ const router = express.Router();
 // Fetch all products
 router.get('/', async (req, res) => {
   try {
-    const products = await Product.find();
-    res.render('index', { products });
+    const productsPerPage = 6; // Number of products per page
+    const page = parseInt(req.query.page) || 1; // Get the current page, default to 1
+
+    // Fetch total product count for pagination
+    const totalProducts = await Product.countDocuments();
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+
+    // Fetch only the required products using `.skip()` and `.limit()`
+    const products = await Product.find()
+      .skip((page - 1) * productsPerPage)
+      .limit(productsPerPage);
+
+    res.render('index', {
+      products,
+      currentPage: page,
+      totalPages
+    });
   } catch (err) {
     res.status(500).send(err);
   }
 });
 
+
 // Filter products based on content-based filtering
 router.get('/filter', async (req, res) => {
-  const { query } = req.query; // Get query parameter for filtering
-  try {
-    // Fetch all products from DB
-    const products = await Product.find();
+  const { query } = req.query;
+  const productsPerPage = 6; // Number of products per page
+  const page = parseInt(req.query.page) || 1;
 
-    // Content-based filtering logic
-    const filteredProducts = products.filter((product) => {
-      // Check if the product's name, description, or attributes contain the query
+  try {
+    // Fetch all products from the database
+    let products = await Product.find();
+
+    // Apply content-based filtering
+    products = products.filter((product) => {
       return (
         product.name.toLowerCase().includes(query.toLowerCase()) ||
         product.description.toLowerCase().includes(query.toLowerCase()) ||
@@ -29,10 +47,22 @@ router.get('/filter', async (req, res) => {
       );
     });
 
-    res.render('index', { products: filteredProducts });  // Pass filtered products to the view
+    const totalProducts = products.length;
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+
+    // Slice products for pagination
+    const paginatedProducts = products.slice((page - 1) * productsPerPage, page * productsPerPage);
+
+    res.render('index', {
+      products: paginatedProducts,
+      currentPage: page,
+      totalPages,
+      query // Keep query in pagination links
+    });
   } catch (err) {
     res.status(500).send(err);
   }
 });
+
 
 module.exports = router;
